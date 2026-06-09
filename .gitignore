@@ -14,7 +14,7 @@ completed_upload/
 pending_upload/
 
 # User-specific configuration (if sensitive keys need to be protected)
-config.py
+# config.py
 
 # OS generated files
 .DS_Store
