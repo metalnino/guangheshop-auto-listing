@@ -22,7 +22,7 @@ echo [INFO] Searching for Python...
 :: Find Python executable (skip Windows Store stub)
 set "PY_EXE="
 for /f "delims=" %%P in ('where python 2^>nul') do (
-    echo %%P | findstr /i "WindowsApps" >nul
+    echo "%%P" | findstr /i "WindowsApps" >nul
     if errorlevel 1 (
         set "PY_EXE=%%P"
         goto :py_found
