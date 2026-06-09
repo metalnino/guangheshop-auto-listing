@@ -1,0 +1,50 @@
+# -*- coding: utf-8 -*-
+"""
+自动商品上架程序 — 配置文件示例
+使用前请复制本文件并重命名为 config.py，并填入您自己的配置信息。
+"""
+from decimal import Decimal
+from pymysql.cursors import DictCursor
+
+# ============================================================
+# 数据库配置
+# ============================================================
+DB_CONFIG = {
+    'host': 'your-db-host',
+    'port': 3306,
+    'user': 'your-db-username',
+    'password': 'your-db-password',
+    'database': 'guangheshop',
+    'charset': 'utf8mb4',
+    'cursorclass': DictCursor
+}
+
+# ============================================================
+# 腾讯云 COS 配置
+# ============================================================
+COS_CONFIG = {
+    'secret_id': 'YOUR_TENCENT_COS_SECRET_ID',
+    'secret_key': 'YOUR_TENCENT_COS_SECRET_KEY',
+    'region': 'ap-shanghai',
+    'bucket': 'your-bucket-name-xxxxxx',
+    'upload_prefix': 'activity/',  # 上传路径前缀
+    'upload_to_cos': True,         # 是否上传到 COS (测试环境可置为 False)
+}
+
+# ============================================================
+# AI 生图管线配置
+# ============================================================
+AI_OUTPUT_DIR = r"D:\path\to\your\AI_生图流程化项目_v2\output"
+
+# ============================================================
+# 商品基础默认值配置（仅保留不在 Excel 表格中体现的内部字段）
+# 用户可见的默认值（单位、公共/私有）已直接预填在 Excel 模板中
+# ============================================================
+DEFAULTS = {
+    'category_id': 0,
+    'brand_id': 0,
+    'is_on_sale': 1,
+    'sort_order': 100,
+    'counter_price': Decimal('0.00'),
+    'retail_price': Decimal('0.00'),
+}

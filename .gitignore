@@ -1,0 +1,21 @@
+# Python virtual environment
+.venv/
+venv/
+ENV/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Project specific upload & log folders
+logs/
+completed_upload/
+pending_upload/
+
+# User-specific configuration (if sensitive keys need to be protected)
+config.py
+
+# OS generated files
+.DS_Store
+Thumbs.db
