@@ -823,56 +823,106 @@ def full_listing(product_data, dry_run=False):
     conn = get_connection()
     try:
         conn.begin()
+        cursor = conn.cursor()
 
-        # 处理图片（如果是本地路径则上传COS）
-        pic_url = product_data['pic_url']
-        if dry_run:
-            # DRY-RUN：不上传，仅显示将要处理的图片
-            if not pic_url.startswith('http'):
-                logger.info(f"  [DRY-RUN] 将上传主图: {pic_url}")
-            gallery = product_data.get('gallery', [pic_url])
-            for g in gallery:
-                if not g.startswith('http'):
-                    logger.info(f"  [DRY-RUN] 将上传轮播图: {g}")
+        # 预先检查商品规格 (SKU) 是否已存在于数据库
+        name = product_data['name']
+        spec_value = product_data['specifications']
+        spec_json = json.dumps([spec_value], ensure_ascii=False)
+
+        cursor.execute(
+            "SELECT id FROM litemall_goods WHERE name = %s AND deleted = 0 LIMIT 1",
+            (name,)
+        )
+        existing_goods = cursor.fetchone()
+
+        existing_sku = None
+        if existing_goods:
+            goods_id = existing_goods['id']
+            cursor.execute(
+                "SELECT id FROM litemall_goods_product WHERE goods_id = %s AND specifications = %s AND deleted = 0 LIMIT 1",
+                (goods_id, spec_json)
+            )
+            existing_sku = cursor.fetchone()
+
+        if existing_goods and existing_sku:
+            # 商品与规格均已存在，跳过图片上传与创建
+            goods_id = existing_goods['id']
+            product_id = existing_sku['id']
+            logger.info(f"  ✓ 商品及规格已存在于数据库: goods_id={goods_id}, product_id={product_id}，跳过图片上传与商品创建")
+            
+            if not dry_run:
+                selling_price = product_data.get('wholesale_price') or Decimal('0.00')
+                cursor.execute(
+                    "UPDATE litemall_goods SET retail_price = %s, counter_price = %s WHERE id = %s",
+                    (selling_price, selling_price, goods_id)
+                )
         else:
-            # 正式执行：上传图片，使用缓存避免同一文件重复上传
-            uploaded_cache = {}  # local_path -> cos_url
-            if not pic_url.startswith('http'):
-                pic_url = upload_image_to_cos(pic_url)
-                uploaded_cache[product_data['pic_url']] = pic_url
-
+            # 需要新增商品（goods不存在）或新增规格（goods存在但sku不存在）
+            pic_url = product_data['pic_url']
             gallery = product_data.get('gallery', [pic_url])
-            uploaded_gallery = []
-            for g in gallery:
-                if g.startswith('http'):
-                    uploaded_gallery.append(g)
-                elif g in uploaded_cache:
-                    uploaded_gallery.append(uploaded_cache[g])
-                    logger.info(f"  复用已上传图片: {g} -> {uploaded_cache[g]}")
+
+            # 判断是否仅仅需要新增规格（商品已存在，只需新增规格）
+            only_add_spec = (existing_goods is not None)
+
+            if only_add_spec:
+                # 仅新增规格时：只上传主图/规格图(pic_url)，不上传轮播图(gallery)
+                logger.info(f"  ℹ️ 商品已存在，仅新增规格。只上传规格图，跳过轮播图上传。")
+                if dry_run:
+                    if not pic_url.startswith('http'):
+                        logger.info(f"  [DRY-RUN] 将上传主图/规格图: {pic_url}")
+                    gallery = []
                 else:
-                    url = upload_image_to_cos(g)
-                    uploaded_cache[g] = url
-                    uploaded_gallery.append(url)
-            gallery = uploaded_gallery
+                    if not pic_url.startswith('http'):
+                        pic_url = upload_image_to_cos(pic_url)
+                    gallery = []
+            else:
+                # 崭新商品：必须上传主图和所有轮播图
+                if dry_run:
+                    # DRY-RUN：不上传，仅显示将要处理的图片
+                    if not pic_url.startswith('http'):
+                        logger.info(f"  [DRY-RUN] 将上传主图: {pic_url}")
+                    for g in gallery:
+                        if not g.startswith('http'):
+                            logger.info(f"  [DRY-RUN] 将上传轮播图: {g}")
+                else:
+                    # 正式执行：上传图片，使用缓存避免同一文件重复上传
+                    uploaded_cache = {}  # local_path -> cos_url
+                    if not pic_url.startswith('http'):
+                        pic_url = upload_image_to_cos(pic_url)
+                        uploaded_cache[product_data['pic_url']] = pic_url
 
-        # 步骤1: 创建商品
-        selling_price = product_data.get('wholesale_price') or Decimal('0.00')
-        goods_data = {
-            'name': product_data['name'],
-            'pic_url': pic_url,
-            'gallery': gallery,
-            'unit': product_data.get('unit') or '盆',
-            'category_id': product_data.get('category_id', DEFAULTS['category_id']),
-            'specifications': product_data['specifications'],
-            'spec_name': product_data.get('spec_name', '规格'),
-            'sku_price': product_data.get('sku_price') or selling_price,
-            'sku_url': product_data.get('sku_url', pic_url),
-            'detail': product_data.get('detail', None),
-            'retail_price': selling_price,
-            'counter_price': selling_price,
-        }
+                    uploaded_gallery = []
+                    for g in gallery:
+                        if g.startswith('http'):
+                            uploaded_gallery.append(g)
+                        elif g in uploaded_cache:
+                            uploaded_gallery.append(uploaded_cache[g])
+                            logger.info(f"  复用已上传图片: {g} -> {uploaded_cache[g]}")
+                        else:
+                            url = upload_image_to_cos(g)
+                            uploaded_cache[g] = url
+                            uploaded_gallery.append(url)
+                    gallery = uploaded_gallery
 
-        goods_id, product_id = create_goods(conn, goods_data, dry_run=dry_run)
+            # 步骤1: 创建商品
+            selling_price = product_data.get('wholesale_price') or Decimal('0.00')
+            goods_data = {
+                'name': product_data['name'],
+                'pic_url': pic_url,
+                'gallery': gallery,
+                'unit': product_data.get('unit') or '盆',
+                'category_id': product_data.get('category_id', DEFAULTS['category_id']),
+                'specifications': product_data['specifications'],
+                'spec_name': product_data.get('spec_name', '规格'),
+                'sku_price': product_data.get('sku_price') or selling_price,
+                'sku_url': product_data.get('sku_url', pic_url),
+                'detail': product_data.get('detail', None),
+                'retail_price': selling_price,
+                'counter_price': selling_price,
+            }
+
+            goods_id, product_id = create_goods(conn, goods_data, dry_run=dry_run)
 
         if dry_run:
             logger.info(f"[DRY-RUN] 完整上架流程预览完毕: {product_data['name']}")
