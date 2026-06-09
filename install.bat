@@ -40,14 +40,14 @@ echo [INFO] Using Python: %PY_EXE%
 
 :: Create .venv if not exists
 if not exist ".venv" (
-    echo [INFO] Creating virtual environment (.venv)...
+    echo [INFO] Creating virtual environment .venv...
     "%PY_EXE%" -m venv .venv
     if errorlevel 1 (
         echo [ERROR] Failed to create virtual environment.
         goto :fail
     )
 ) else (
-    echo [INFO] Virtual environment (.venv) already exists.
+    echo [INFO] Virtual environment .venv already exists.
 )
 
 :: Get path to venv python
