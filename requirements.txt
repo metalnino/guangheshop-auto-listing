@@ -7,4 +7,4 @@ pymysql>=1.1.0
 openpyxl>=3.1.0
 
 # 腾讯云 COS 上传
-cos-python-sdk-v5>=5.3.0
+cos-python-sdk-v5>=1.9.0
