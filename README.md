@@ -1,0 +1,1 @@
+# guangheshop-auto-listing
